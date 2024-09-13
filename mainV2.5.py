@@ -4,10 +4,9 @@ import random
 import time
 from fake_useragent import UserAgent
 
-proxies = [
-    '103.140.205.133:1080',
-    # Add more if u want idgaf
-]
+def load_proxies():
+    with open('proxies.txt', 'r') as f:
+        return [line.strip() for line in f if line.strip()]
 
 def get_random_user_agent():
     ua = UserAgent()
@@ -44,27 +43,32 @@ class FaceBook_RegIster():
     def get_cookies(self):
         url = "https://mbasic.facebook.com/reg/?cid=103&refsrc=deprecated&_rdr"
         
+        proxies = load_proxies()
         proxy = random.choice(proxies)
         proxy_dict = {"http": proxy, "https": proxy}
         headers = {
             "User-Agent": get_random_user_agent()
         }
         
-        r = self.session.get(url, headers=headers, proxies=proxy_dict)
-        soup = BeautifulSoup(r.text, 'html.parser')
-        
-        self.cookies['lsd'] = soup.select_one('input[name=lsd]')['value']
-        self.cookies['jazoest'] = soup.select_one('input[name=jazoest]')['value']
-        self.cookies['ccp'] = soup.select_one('input[name=ccp]')['value']
-        self.cookies['reg_instance'] = soup.select_one('input[name=reg_instance]')['value']
-        self.cookies['submission_request'] = soup.select_one('input[name=submission_request]')['value']
-        self.cookies['reg_impression_id'] = soup.select_one('input[name=reg_impression_id]')['value']
-
         try:
-            self.cookies['__s'] = soup.select_one('input[name=__s]')['value']
-            self.cookies['__hsi'] = soup.select_one('input[name=__hsi]')['value']
-        except TypeError:
-            print("Couldn't find __s or __hsi values")
+            r = self.session.get(url, headers=headers, proxies=proxy_dict, timeout=10)
+            soup = BeautifulSoup(r.text, 'html.parser')
+
+            self.cookies['lsd'] = soup.select_one('input[name=lsd]')['value']
+            self.cookies['jazoest'] = soup.select_one('input[name=jazoest]')['value']
+            self.cookies['ccp'] = soup.select_one('input[name=ccp]')['value']
+            self.cookies['reg_instance'] = soup.select_one('input[name=reg_instance]')['value']
+            self.cookies['submission_request'] = soup.select_one('input[name=submission_request]')['value']
+            self.cookies['reg_impression_id'] = soup.select_one('input[name=reg_impression_id]')['value']
+
+            try:
+                self.cookies['__s'] = soup.select_one('input[name=__s]')['value']
+                self.cookies['__hsi'] = soup.select_one('input[name=__hsi]')['value']
+            except TypeError:
+                print("Couldn't find __s or __hsi values")
+        except Exception:
+            print(f"[-] Proxy {proxy} failed, moving onto the next one.")
+            self.get_cookies()
 
     def save_to_text_file(self, username, email, password, status):
         with open('account_info.txt', 'a') as file:
@@ -77,6 +81,7 @@ class FaceBook_RegIster():
     def register(self):
         url = "https://mbasic.facebook.com/reg/submit/?cid=103"
         
+        proxies = load_proxies()
         proxy = random.choice(proxies)
         proxy_dict = {"http": proxy, "https": proxy}
         headers = {
@@ -108,33 +113,37 @@ class FaceBook_RegIster():
         if self.cookies['__hsi']:
             data += f"&__hsi={self.cookies['__hsi']}"
 
-        r = self.session.post(url, headers=headers, data=data, proxies=proxy_dict)
-        
-        if 'take you through a few steps to confirm your account on Facebook' in r.text:
-            print('[+] Account created successfully!')
-            print("[+] Email: " + self.email + "@yopmail.com")
-            print("[+] Password: " + self.password)
-            print("[+] Status: Confirm")
-            print('=' * 40)
-            self.save_to_text_file('Not Found', f'{self.email}@yopmail.com', self.password, 'Confirm')
-        elif 'There was an error with your registration. Please try registering again.' in r.text:
-            print('[X] Blocked from Facebook')
-            print('=' * 40)
-            self.save_to_text_file('Blocked', '', '', '')
-        else:
-            try:
-                user_id = r.cookies['c_user']
+        try:
+            r = self.session.post(url, headers=headers, data=data, proxies=proxy_dict, timeout=10)
+            
+            if 'take you through a few steps to confirm your account on Facebook' in r.text:
                 print('[+] Account created successfully!')
-                print('[+] Username: ' + user_id)
                 print("[+] Email: " + self.email + "@yopmail.com")
                 print("[+] Password: " + self.password)
-                print("[+] Status: Done Create Account")
+                print("[+] Status: Confirm")
                 print('=' * 40)
-                self.save_to_text_file(user_id, f'{self.email}@yopmail.com', self.password, 'Done Create Account')
-            except KeyError:
-                print("[X] Use VPN or better proxy")
+                self.save_to_text_file('Not Found', f'{self.email}@yopmail.com', self.password, 'Confirm')
+            elif 'There was an error with your registration. Please try registering again.' in r.text:
+                print('[X] Blocked from Facebook')
                 print('=' * 40)
-                self.save_to_text_file('', '', '', 'Use VPN')
+                self.save_to_text_file('Blocked', '', '', '')
+            else:
+                try:
+                    user_id = r.cookies['c_user']
+                    print('[+] Account created successfully!')
+                    print('[+] Username: ' + user_id)
+                    print("[+] Email: " + self.email + "@yopmail.com")
+                    print("[+] Password: " + self.password)
+                    print("[+] Status: Done Create Account")
+                    print('=' * 40)
+                    self.save_to_text_file(user_id, f'{self.email}@yopmail.com', self.password, 'Done Create Account')
+                except KeyError:
+                    print("[X] Use VPN or better proxy")
+                    print('=' * 40)
+                    self.save_to_text_file('', '', '', 'Use VPN')
+        except Exception:
+            print(f"[-] Proxy {proxy} failed during registration, moving onto next one.")
+            self.register()
 
 while True:
     FaceBook_RegIster()
